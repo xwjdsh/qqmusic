@@ -90,7 +90,7 @@ func main() {
 		songData = append(songData,
 			[]string{
 				fmt.Sprintf("<%s> https://y.qq.com/n/ryqq/songDetail/%s", info.Title, info.Mid),
-				fmt.Sprintf("<%s> https://y.qq.com/n/ryqq/albumDetail/%s", info.Album.Title, info.Mid),
+				fmt.Sprintf("<%s> https://y.qq.com/n/ryqq/albumDetail/%s", info.Album.Title, info.Album.Mid),
 				strconv.Itoa(song.CommnetCount),
 				strconv.Itoa(song.FavorCount),
 			},
