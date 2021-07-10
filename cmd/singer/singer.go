@@ -98,7 +98,7 @@ func main() {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Name", "Album", "Commnet", "Favor"})
+	table.SetHeader([]string{"Name", "Album", "Comment", "Favor"})
 	table.SetRowLine(true) // Enable row line
 
 	table.SetCenterSeparator("*")
