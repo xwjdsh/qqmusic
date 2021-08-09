@@ -11,4 +11,4 @@ jobs:
       - name: test
         run: go test ./...
       - name: build
-        run: go build ./cmd/singer
+        run: go build ./cmd/qqmusic
