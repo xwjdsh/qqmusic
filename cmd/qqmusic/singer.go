@@ -1,7 +1,7 @@
 package main
 
 import (
-	"flag"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -9,33 +9,32 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/urfave/cli/v2"
 
 	"github.com/xwjdsh/qqmusic"
 )
 
-var (
-	songCount = flag.Int("count", 10, "song count")
-	orderBy   = flag.String("order", "favor", "order by [favor|comment]")
-)
+func singerAction(client *qqmusic.Client, c *cli.Context) error {
+	singerInfo, err := client.SearchSinger(strings.Join(c.Args().Slice(), " "))
+	if err != nil {
+		return err
+	}
 
-func main() {
-	flag.Parse()
-	args := flag.Args()
-	exitIf(len(args) == 0, "singer name is required!")
+	if singerInfo == nil {
+		return errors.New("singer not found!")
+	}
 
-	c := qqmusic.New()
-
-	singerInfo, err := c.SearchSinger(strings.Join(args, " "))
-	exitIfErr(err)
-	exitIf(singerInfo == nil, "singer not found!")
-
-	fansCount, err := c.GetSingerFansCount(singerInfo.Singermid)
-	exitIfErr(err)
+	fansCount, err := client.GetSingerFansCount(singerInfo.Singermid)
+	if err != nil {
+		return err
+	}
 
 	songList := []*qqmusic.Songinfo{}
 	for page := 1; ; page += 1 {
-		total, songs, err := c.GetSonglistBySinger(singerInfo.Singermid, page, 50)
-		exitIfErr(err)
+		total, songs, err := client.GetSonglistBySinger(singerInfo.Singermid, page, 50)
+		if err != nil {
+			return err
+		}
 
 		songMids := []string{}
 		songIds := []int{}
@@ -45,11 +44,15 @@ func main() {
 			songIds = append(songIds, info.ID)
 		}
 
-		commentCountMap, err := c.GetSongCommentCount(songIds)
-		exitIfErr(err)
+		commentCountMap, err := client.GetSongCommentCount(songIds)
+		if err != nil {
+			return err
+		}
 
-		favorCountMap, err := c.GetSongFavorCount(songMids)
-		exitIfErr(err)
+		favorCountMap, err := client.GetSongFavorCount(songMids)
+		if err != nil {
+			return err
+		}
 
 		for _, song := range songs {
 			song.CommnetCount = commentCountMap[strconv.Itoa(song.Info.ID)]
@@ -77,14 +80,14 @@ func main() {
 	singerTable.AppendBulk(data)
 
 	sort.Slice(songList, func(i, j int) bool {
-		if *orderBy == "comment" {
+		if c.String("order") == "comment" {
 			return songList[i].CommnetCount > songList[j].CommnetCount
 		}
 		return songList[i].FavorCount > songList[j].FavorCount
 	})
 
 	songData := [][]string{}
-	for i := 0; i < *songCount; i++ {
+	for i := 0; i < c.Int("count"); i++ {
 		song := songList[i]
 		info := song.Info
 		songData = append(songData,
@@ -111,15 +114,5 @@ func main() {
 	singerTable.Render()
 	fmt.Println()
 	table.Render()
-}
-
-func exitIf(b bool, msg interface{}) {
-	if b {
-		fmt.Println(msg)
-		os.Exit(1)
-	}
-}
-
-func exitIfErr(err error) {
-	exitIf(err != nil, err)
+	return nil
 }
