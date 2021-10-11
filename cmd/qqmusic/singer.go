@@ -31,9 +31,12 @@ func singerAction(client *qqmusic.Client, c *cli.Context) error {
 
 	songList := []*qqmusic.Songinfo{}
 	for page := 1; ; page += 1 {
-		total, songs, err := client.GetSonglistBySinger(singerInfo.Singermid, page, 50)
+		_, songs, err := client.GetSonglistBySinger(singerInfo.Singermid, page, 50)
 		if err != nil {
 			return err
+		}
+		if len(songs) == 0 {
+			break
 		}
 
 		songMids := []string{}
@@ -59,9 +62,14 @@ func singerAction(client *qqmusic.Client, c *cli.Context) error {
 			song.FavorCount = favorCountMap[song.Info.Mid]
 		}
 
-		songList = append(songList, songs...)
-		if len(songList) >= total {
-			break
+		if c.Bool("solo") {
+			for _, song := range songs {
+				if len(song.Info.Singer) == 1 {
+					songList = append(songList, song)
+				}
+			}
+		} else {
+			songList = append(songList, songs...)
 		}
 	}
 

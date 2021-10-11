@@ -29,6 +29,10 @@ func main() {
 						Usage: "Song count",
 						Value: 10,
 					},
+					&cli.BoolFlag{
+						Name:  "solo",
+						Usage: "Solo",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					return singerAction(h, c)
