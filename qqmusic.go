@@ -8,9 +8,51 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 const baseUrl = "https://u.y.qq.com/cgi-bin/musicu.fcg"
+
+type SingerInfo struct {
+	Title      string `json:"title"`
+	Desciption string `json:"desciption"`
+	CustomInfo struct {
+		AlbumNum  string `json:"album_num"`
+		ExtraDesc string `json:"extra_desc"`
+		IconType  string `json:"icon_type"`
+		Ifpicurl  string `json:"ifpicurl"`
+		IsFollow  string `json:"is_follow"`
+		Singermid string `json:"mid"`
+		MvNum     string `json:"mv_num"`
+		SongNum   string `json:"song_num"`
+	} `json:"custom_info"`
+	TrackList struct {
+		Items []struct {
+			ID   int    `json:"id"`
+			Mid  string `json:"mid"`
+			Name string `json:"name"`
+		} `json:"items"`
+	} `json:"track_list"`
+}
+
+type SingerInfoResult struct {
+	Code    int    `json:"code"`
+	Ts      int64  `json:"ts"`
+	StartTs int64  `json:"start_ts"`
+	Traceid string `json:"traceid"`
+	Result  struct {
+		Code int `json:"code"`
+		Data struct {
+			Body struct {
+				Zhida struct {
+					List []*SingerInfo `json:"list"`
+				} `json:"zhida"`
+			} `json:"body"`
+			Code int `json:"code"`
+			Ver  int `json:"ver"`
+		} `json:"data"`
+	} `json:"result"`
+}
 
 type Songinfo struct {
 	CommnetCount int `json:"-"`
@@ -74,21 +116,14 @@ type Songinfo struct {
 	} `json:"songInfo"`
 }
 
-type SingerInfo struct {
-	Albumnum          int    `json:"albumNum"`
-	Mvnum             int    `json:"mvNum"`
-	Singerid          int    `json:"singerID"`
-	Singermid         string `json:"singerMID"`
-	Singername        string `json:"singerName"`
-	Singerpic         string `json:"singerPic"`
-	SingernameHilight string `json:"singername_hilight"`
-	Songnum           int    `json:"songNum"`
+type Client struct {
+	cookie string
 }
 
-type Client struct{}
-
-func New() *Client {
-	return &Client{}
+func New(cookie string) *Client {
+	return &Client{
+		cookie: cookie,
+	}
 }
 
 func (c *Client) GetSingerFansCount(singerMid string) (int, error) {
@@ -140,56 +175,46 @@ func (c *Client) GetSingerFansCount(singerMid string) (int, error) {
 }
 
 func (c *Client) SearchSinger(name string) (*SingerInfo, error) {
-	data, err := c.keywordSearch(name, "")
+	data, err := c.keywordSearch(name)
 	if err != nil {
 		return nil, err
 	}
 
-	var result struct {
-		Code int `json:"code"`
-		Data struct {
-			Zhida struct {
-				Type        int         `json:"type"`
-				ZhidaSinger *SingerInfo `json:"zhida_singer"`
-			} `json:"zhida"`
-		} `json:"data"`
-		Message string `json:"message"`
-	}
-
+	var result SingerInfoResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, err
 	}
-	if result.Code != 0 {
+	if result.Code != 0 || result.Result.Data.Code != 0 {
 		return nil, fmt.Errorf("SearchSinger error: %s", string(data))
 	}
 
-	return result.Data.Zhida.ZhidaSinger, nil
+	if len(result.Result.Data.Body.Zhida.List) == 0 {
+		return nil, fmt.Errorf("SearchSinger not found: %s", string(data))
+	}
+	info := result.Result.Data.Body.Zhida.List[0]
+	desc := result.Result.Data.Body.Zhida.List[0].Desciption
+	r := strings.Split(desc, " ")
+	if len(r) == 3 {
+		info.CustomInfo.SongNum = strings.Split(r[0], ":")[1]
+		info.CustomInfo.AlbumNum = strings.Split(r[1], ":")[1]
+		info.CustomInfo.MvNum = strings.Split(r[2], ":")[1]
+	}
+
+	return info, nil
 }
 
-func (c *Client) keywordSearch(keyword, ty string) ([]byte, error) {
-	queryUrl := "https://c.y.qq.com/soso/fcgi-bin/client_search_cp"
+func (c *Client) keywordSearch(keyword string) ([]byte, error) {
+	module := "music.search.SearchCgiService"
+	method := "DoSearchForQQMusicDesktop"
 	param := map[string]interface{}{
-		"new_json":    "1",
-		"catZhida":    "1",
-		"w":           keyword,
-		"format":      "json",
-		"inCharset":   "utf8",
-		"outCharset":  "utf8",
-		"platform":    "yqq.json",
-		"needNewCode": "0",
-	}
-	switch ty {
-	case "lyric":
-		param["t"] = 7
-	case "album":
-		param["t"] = 8
-	case "song":
-		param["t"] = 0
-	case "mv":
-		param["t"] = 12
+		"remoteplace":  "txt.yqq.center",
+		"search_type":  0,
+		"query":        keyword,
+		"page_num":     1,
+		"num_per_page": 10,
 	}
 
-	return c.get("url", queryUrl, param)
+	return c.post(module, method, param)
 }
 
 func (c *Client) GetSonglistBySinger(singerMid string, page, pageSize int) (int, []*Songinfo, error) {
@@ -363,7 +388,14 @@ func (c *Client) post(module, method string, param map[string]interface{}) ([]by
 		return nil, err
 	}
 
-	resp, err := http.Post(baseUrl, "application/json", bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, baseUrl, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("cookie", c.cookie)
+	req.Header.Set("content-type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

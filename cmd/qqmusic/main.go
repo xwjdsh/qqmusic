@@ -10,7 +10,12 @@ import (
 )
 
 func main() {
-	h := qqmusic.New()
+	cookieName := "QQMUSIC_COOKIE"
+	cookie := os.Getenv(cookieName)
+	if cookie == "" {
+		log.Fatalf("%s env is empty", cookieName)
+	}
+	h := qqmusic.New(cookie)
 	app := &cli.App{
 		Name:  "qqmusic",
 		Usage: "command-line qqmusic tool",
@@ -48,5 +53,4 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }

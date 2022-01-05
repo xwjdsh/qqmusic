@@ -24,14 +24,14 @@ func singerAction(client *qqmusic.Client, c *cli.Context) error {
 		return errors.New("singer not found!")
 	}
 
-	fansCount, err := client.GetSingerFansCount(singerInfo.Singermid)
+	fansCount, err := client.GetSingerFansCount(singerInfo.CustomInfo.Singermid)
 	if err != nil {
 		return err
 	}
 
 	songList := []*qqmusic.Songinfo{}
 	for page := 1; ; page += 1 {
-		_, songs, err := client.GetSonglistBySinger(singerInfo.Singermid, page, 50)
+		_, songs, err := client.GetSonglistBySinger(singerInfo.CustomInfo.Singermid, page, 50)
 		if err != nil {
 			return err
 		}
@@ -75,11 +75,11 @@ func singerAction(client *qqmusic.Client, c *cli.Context) error {
 
 	data := [][]string{
 		{
-			fmt.Sprintf("%s https://y.qq.com/n/ryqq/singer/%s", singerInfo.Singername, singerInfo.Singermid),
+			fmt.Sprintf("%s https://y.qq.com/n/ryqq/singer/%s", singerInfo.Title, singerInfo.CustomInfo.Singermid),
 			strconv.Itoa(fansCount),
-			strconv.Itoa(singerInfo.Albumnum),
-			strconv.Itoa(singerInfo.Songnum),
-			strconv.Itoa(singerInfo.Mvnum),
+			singerInfo.CustomInfo.AlbumNum,
+			singerInfo.CustomInfo.SongNum,
+			singerInfo.CustomInfo.MvNum,
 		},
 	}
 
